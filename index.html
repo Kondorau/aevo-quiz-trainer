@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDF Quiz-Trainer Ultimate</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root { 
+            --primary-green: #4CAF50; --bg-light: #f0f2f5; --text-dark: #333; 
+            --accent-blue: #2196F3; --error-red: #d32f2f; --card-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            --card-bg: #ffffff;
+        }
+        body.dark-mode {
+            --bg-light: #1a1a1a; --text-dark: #f0f0f0; --card-bg: #2d2d2d; --card-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; 
+            background-color: var(--bg-light); color: var(--text-dark);
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            transition: background 0.3s, color 0.3s;
+        }
+        .header-area { 
+            background: var(--card-bg); padding: 10px 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000; text-align: center; position: relative;
+        }
+        .main-wrapper { 
+            display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; padding: 20px;
+            flex: 1; overflow: hidden; width: 100%; box-sizing: border-box;
+        }
+        .quiz-column { flex: 1.5; min-width: 320px; display: flex; flex-direction: column; gap: 15px; }
+        .error-column { 
+            flex: 1; min-width: 300px; background: var(--card-bg); padding: 20px; border-radius: 15px; 
+            box-shadow: var(--card-shadow); display: none; flex-direction: column;
+        }
+        #errorListContent { overflow-y: auto; flex: 1; margin-top: 10px; padding-right: 5px; }
+        .stats-box { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: var(--card-shadow); text-align: center; }
+        .app-card { background: var(--card-bg); padding: 25px; border-radius: 15px; box-shadow: var(--card-shadow); overflow-y: auto; }
+        .option-btn { 
+            display: block; width: 100%; padding: 12px; margin-bottom: 8px; 
+            background-color: var(--card-bg); color: var(--text-dark); border: 2px solid #e0e0e0; 
+            border-radius: 10px; text-align: left; cursor: pointer; transition: 0.2s;
+        }
+        .selected-correct { background-color: #e8f5e9 !important; border-color: var(--primary-green) !important; color: #2e7d32 !important; font-weight: bold; }
+        .selected-wrong { background-color: #ffebee !important; border-color: var(--error-red) !important; color: #c62828 !important; }
+        .nav-btn { padding: 12px 20px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+        .error-item { background: rgba(0,0,0,0.03); border-left: 5px solid var(--error-red); padding: 10px; margin-bottom: 8px; border-radius: 4px; font-size: 0.85em; }
+        @media (max-width: 900px) { body { overflow: auto; height: auto; } .main-wrapper { flex-direction: column; } }
+    </style>
+</head>
+<body id="mainBody">
+
+    <div class="header-area">
+        <span style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:1.5em;" onclick="toggleDarkMode()">🌓</span>
+        <h1 id="ui-title">PDF Quiz-Trainer Ultimate</h1>
+        <div id="uploadZone">
+            <input type="file" id="pdfInput" accept="application/pdf">
+            <button id="clearStorage" style="display:none; margin-left:10px; background:#ff5252; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" onclick="resetAll()">Daten löschen</button>
+        </div>
+    </div>
+
+    <div class="main-wrapper">
+        <div class="quiz-column">
+            <div id="statsBox" class="stats-box" style="display:none;">
+                <h3 style="margin:0 0 10px 0; font-size: 1em;">Deine Erfolgsquote</h3>
+                <div style="height: 12px; background: #eee; border-radius: 6px; overflow: hidden; display: flex;">
+                    <div id="bar-correct" style="width: 0%; background: var(--primary-green); transition: width 0.5s;"></div>
+                    <div id="bar-wrong" style="width: 0%; background: var(--error-red); transition: width 0.5s;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 0.9em; margin-top: 5px;">
+                    <span id="stat-text-correct" style="color: var(--primary-green);">Richtig: 0%</span>
+                    <span id="stat-text-wrong" style="color: var(--error-red);">Falsch: 0%</span>
+                </div>
+                <div id="stat-total" style="font-size: 0.8em; color: #888; margin-top: 5px;">Fragen beantwortet: 0</div>
+            </div>
+
+            <div id="quizContainer" class="app-card" style="display: none;">
+                <div id="progress" style="color: var(--accent-blue); font-weight: bold; margin-bottom: 10px; font-size: 0.9em;"></div>
+                <div id="frage" style="font-weight: bold; margin-bottom: 20px; font-size: 1.1em;"></div>
+                <div id="optionen"></div>
+                <div id="feedback" style="text-align: center; font-weight: bold; margin: 15px 0; min-height: 24px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="backButton" class="nav-btn" style="background:#90a4ae;">⬅</button>
+                    <button id="nextButton" class="nav-btn" style="background:var(--accent-blue); flex: 2; display: none;">Nächste Frage ➡</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sideErrorList" class="error-column">
+            <h3 style="margin: 0; color: var(--error-red);">Fehler-Log</h3>
+            <div id="errorListContent"></div>
+            <button class="nav-btn" style="background:#607d8b; margin-top:10px; font-size:0.8em;" onclick="exportErrors()">💾 Export (.txt)</button>
+            <button class="nav-btn" style="background:#f57c00; margin-top:5px; font-size:0.8em;" onclick="startErrorQuiz()">🔥 Nur Fehler üben</button>
+        </div>
+    </div>
+
+    <script>
+        let alleFragen = [];
+        let aktuelleFragenListe = [];
+        let aktuelleFrageIdx = 0;
+        
+        // Stats-Variablen
+        let korrekteAntwortenCount = parseInt(localStorage.getItem('quiz_punkte')) || 0;
+        let gesamtBeantwortetCount = parseInt(localStorage.getItem('quiz_beantwortet')) || 0;
+        let fehlerListe = JSON.parse(localStorage.getItem('quiz_fehler_liste')) || [];
+
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+        function resetAll() { if(confirm("Alle Daten löschen?")) { localStorage.clear(); location.reload(); } }
+
+        document.getElementById("pdfInput").addEventListener("change", async function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async function() {
+                const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+                let text = "";
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map(item => item.str).join(" ") + "\n";
+                }
+                parseFragen(text);
+                if (alleFragen.length > 0) {
+                    aktuelleFragenListe = [...alleFragen];
+                    document.getElementById("uploadZone").style.display = "none";
+                    document.getElementById("quizContainer").style.display = "block";
+                    document.getElementById("statsBox").style.display = "block";
+                    ladeFrage();
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function parseFragen(text) {
+            alleFragen = [];
+            const blocks = text.split(/Frage\s*\d*[:\s\?]/gi).slice(1);
+            blocks.forEach((block, idx) => {
+                const parts = block.split(/\s*[a]\)\s*/);
+                if (parts.length < 2) return;
+                const opts = [];
+                const regex = /([a-e]\)\s*.*?(?=[a-e]\)|$))/gs;
+                let m; while ((m = regex.exec("a) " + parts[1])) !== null) opts.push(m[0].trim());
+                alleFragen.push({ id: idx, frage: parts[0].trim(), optionen: opts, korrekt: opts[0], beantwortet: false });
+            });
+        }
+
+        function ladeFrage() {
+            const f = aktuelleFragenListe[aktuelleFrageIdx];
+            document.getElementById("progress").innerText = `FRAGE ${aktuelleFrageIdx + 1} / ${aktuelleFragenListe.length}`;
+            document.getElementById("frage").innerText = f.frage;
+            document.getElementById("feedback").innerText = "";
+            document.getElementById("nextButton").style.display = f.beantwortet ? "block" : "none";
+            document.getElementById("backButton").style.visibility = aktuelleFrageIdx > 0 ? "visible" : "hidden";
+            
+            const optDiv = document.getElementById("optionen");
+            optDiv.innerHTML = "";
+            if (!f.gemischte) f.gemischte = [...f.optionen].sort(() => Math.random() - 0.5);
+
+            f.gemischte.forEach(opt => {
+                const b = document.createElement("button");
+                b.className = "option-btn";
+                b.innerText = opt;
+                if (f.beantwortet) {
+                    b.disabled = true;
+                    if (opt === f.korrekt) b.classList.add('selected-correct');
+                    if (opt === f.gewaehlt && opt !== f.korrekt) b.classList.add('selected-wrong');
+                } else {
+                    b.onclick = () => checkAntwort(opt);
+                }
+                optDiv.appendChild(b);
+            });
+            updateStatsUI();
+        }
+
+        function checkAntwort(wahl) {
+            const f = aktuelleFragenListe[aktuelleFrageIdx];
+            f.beantwortet = true;
+            f.gewaehlt = wahl;
+            gesamtBeantwortetCount++;
+            
+            if (wahl === f.korrekt) {
+                korrekteAntwortenCount++;
+                document.getElementById("feedback").innerHTML = "<span style='color:var(--primary-green)'>Richtig! ✔</span>";
+                // Aus Fehlerliste entfernen, falls sie drin war
+                fehlerListe = fehlerListe.filter(item => item.frage !== f.frage);
+            } else {
+                document.getElementById("feedback").innerHTML = "<span style='color:var(--error-red)'>Falsch! ✘</span>";
+                // Zur Fehlerliste hinzufügen (Dubletten vermeiden)
+                if (!fehlerListe.some(item => item.frage === f.frage)) {
+                    fehlerListe.push({ frage: f.frage, korrekt: f.korrekt });
+                }
+            }
+
+            // Persistence
+            localStorage.setItem('quiz_punkte', korrekteAntwortenCount);
+            localStorage.setItem('quiz_beantwortet', gesamtBeantwortetCount);
+            localStorage.setItem('quiz_fehler_liste', JSON.stringify(fehlerListe));
+
+            ladeFrage(); // UI Refresh
+        }
+
+        function updateStatsUI() {
+            const barCorrect = document.getElementById("bar-correct");
+            const barWrong = document.getElementById("bar-wrong");
+            const textCorrect = document.getElementById("stat-text-correct");
+            const textWrong = document.getElementById("stat-text-wrong");
+            const totalInfo = document.getElementById("stat-total");
+
+            if (gesamtBeantwortetCount > 0) {
+                const percentCorrect = Math.round((korrekteAntwortenCount / gesamtBeantwortetCount) * 100);
+                const percentWrong = 100 - percentCorrect;
+                
+                barCorrect.style.width = percentCorrect + "%";
+                barWrong.style.width = percentWrong + "%";
+                textCorrect.innerText = `Richtig: ${percentCorrect}%`;
+                textWrong.innerText = `Falsch: ${percentWrong}%`;
+                totalInfo.innerText = `Fragen insgesamt beantwortet: ${gesamtBeantwortetCount}`;
+            }
+
+            // Fehlerliste rechts updaten
+            const sideColumn = document.getElementById("sideErrorList");
+            const listContent = document.getElementById("errorListContent");
+            if (fehlerListe.length > 0) {
+                sideColumn.style.display = "flex";
+                document.getElementById("clearStorage").style.display = "inline-block";
+                listContent.innerHTML = "";
+                fehlerListe.forEach(f => {
+                    listContent.innerHTML += `<div class="error-item"><strong>Frage:</strong> ${f.frage.substring(0,60)}...<br><span style="color:var(--primary-green)">Lösung: ${f.korrekt}</span></div>`;
+                });
+            } else {
+                sideColumn.style.display = "none";
+            }
+        }
+
+        function startErrorQuiz() {
+            if (fehlerListe.length === 0) return;
+            aktuelleFragenListe = fehlerListe.map(f => ({...f, optionen: [f.korrekt, "Anderer Wert 1", "Anderer Wert 2"], beantwortet: false, gewaehlt: null, gemischte: null}));
+            aktuelleFrageIdx = 0;
+            ladeFrage();
+        }
+
+        function exportErrors() {
+            let t = "MEINE AEVO FEHLERLISTE\n" + "=".repeat(20) + "\n\n";
+            fehlerListe.forEach((f, i) => t += `[${i+1}] FRAGE: ${f.frage}\nLOESUNG: ${f.korrekt}\n\n`);
+            const blob = new Blob([t], {type: "text/plain"});
+            const a = document.createElement("a");
+            a.download = "AEVO_Fehler.txt"; a.href = URL.createObjectURL(blob); a.click();
+        }
+
+        document.getElementById("nextButton").onclick = () => { aktuelleFrageIdx++; ladeFrage(); };
+        document.getElementById("backButton").onclick = () => { if(aktuelleFrageIdx > 0) {aktuelleFrageIdx--; ladeFrage();} };
+
+        // Initialer UI Call
+        updateStatsUI();
+    </script>
+</body>
+</html>
