@@ -1,4 +1,4 @@
-# 🎓 AEVO Quiz-Trainer Pro
+# 🎓 Universeller PDF Quiz-Trainer: Verwandelt strukturierte PDF-Fragenkataloge in interaktive Lern-Dashboards
 
 Ein interaktives Dashboard zur Vorbereitung auf die AEVO-Prüfung (AdA-Schein). Dieses Tool wurde entwickelt, um statische Fragenkataloge aus PDFs in ein modernes, effizientes Lern-Erlebnis zu verwandeln.
 
